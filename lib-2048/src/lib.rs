@@ -1,6 +1,6 @@
 use std::fmt;
 
-use rand::{seq::SliceRandom, Rng};
+use rand::{rngs::ThreadRng, seq::SliceRandom, Rng};
 
 /// Default dimensions of the [`GameBoard`]
 pub const GAME_BOARD_SIZE: usize = 4;
@@ -15,7 +15,11 @@ pub type GameBoardLocation = (usize, usize);
 /// board, with coordinates increasing as you move toward the bottom-right of
 /// the board. Coordinates are in the form (row, column)
 #[derive(Debug)]
-pub struct GameBoard(pub [[BoardSpace; GAME_BOARD_SIZE]; GAME_BOARD_SIZE]);
+pub struct GameBoard {
+    pub cells: [[BoardSpace; GAME_BOARD_SIZE]; GAME_BOARD_SIZE],
+    pub score: usize,
+    rng: ThreadRng,
+}
 
 impl GameBoard {
     /// Creates a new square [`GameBoard`](Self) with dimensions [`GAME_BOARD_SIZE`], prefilled
@@ -47,17 +51,21 @@ impl GameBoard {
     /// );
     /// ```
     pub fn empty() -> Self {
-        Self([[BoardSpace::Vacant; GAME_BOARD_SIZE]; GAME_BOARD_SIZE])
+        Self {
+            cells: [[BoardSpace::Vacant; GAME_BOARD_SIZE]; GAME_BOARD_SIZE],
+            score: 0,
+            rng: rand::thread_rng(),
+        }
     }
 
     /// Gets the value of a cell on the game board
     pub fn get(&self, (x, y): GameBoardLocation) -> BoardSpace {
-        self.0[y][x]
+        self.cells[y][x]
     }
 
     /// Sets the value of a cell on the game board
     pub fn set(&mut self, (x, y): GameBoardLocation, val: BoardSpace) {
-        self.0[y][x] = val;
+        self.cells[y][x] = val;
     }
 
     /// Moves all tiles on the board
@@ -65,14 +73,14 @@ impl GameBoard {
         let rot = dir as usize;
         self.rotate(rot);
 
-        for y in 0..self.0.len() {
-            for x in 0..self.0.len() {
-                if let BoardSpace::Tile(t) = self.0[y][x] {
-                    for x2 in (x + 1)..self.0.len() {
-                        match self.0[y][x2] {
+        for y in 0..self.cells.len() {
+            for x in 0..self.cells.len() {
+                if let BoardSpace::Tile(t) = self.cells[y][x] {
+                    for x2 in (x + 1)..self.cells.len() {
+                        match self.cells[y][x2] {
                             BoardSpace::Tile(t2) if t == t2 => {
-                                self.0[y][x] = BoardSpace::Tile(t * 2);
-                                self.0[y][x2] = BoardSpace::Vacant;
+                                self.cells[y][x] = BoardSpace::Tile(t * 2);
+                                self.cells[y][x2] = BoardSpace::Vacant;
                                 break;
                             },
 
@@ -83,11 +91,11 @@ impl GameBoard {
                 }
             }
 
-            for x in 0..self.0.len() {
-                if let BoardSpace::Vacant = self.0[y][x] {
-                    for x2 in x..self.0.len() {
-                        if let BoardSpace::Tile(_) = self.0[y][x2] {
-                            self.0[y].swap(x, x2);
+            for x in 0..self.cells.len() {
+                if let BoardSpace::Vacant = self.cells[y][x] {
+                    for x2 in x..self.cells.len() {
+                        if let BoardSpace::Tile(_) = self.cells[y][x2] {
+                            self.cells[y].swap(x, x2);
                             break;
                         }
                     }
@@ -95,7 +103,7 @@ impl GameBoard {
             }
         }
 
-        self.rotate(self.0.len() - rot);
+        self.rotate(self.cells.len() - rot);
 
         self.add_random_tile();
     }
@@ -109,15 +117,15 @@ impl GameBoard {
         for n in 0..4 {
             self.rotate(n);
 
-            for y in 0..self.0.len() {
-                for x in 0..(self.0.len() - 1) {
-                    match self.0[y][x] {
+            for y in 0..self.cells.len() {
+                for x in 0..(self.cells.len() - 1) {
+                    match self.cells[y][x] {
                         BoardSpace::Vacant => {
                             self.rotate(4 - n);
                             return true;
                         },
 
-                        BoardSpace::Tile(t) => match self.0[y][x + 1] {
+                        BoardSpace::Tile(t) => match self.cells[y][x + 1] {
                             BoardSpace::Vacant => {
                                 self.rotate(4 - n);
                                 return true;
@@ -139,17 +147,17 @@ impl GameBoard {
     }
 
     fn rotate(&mut self, times: usize) {
-        let n = self.0.len();
+        let n = self.cells.len();
 
         for _ in 0..times {
             // credit: someone on stackoverflow idk
             for i in 0..(n / 2) {
                 for j in i..(n - i - 1) {
-                    let tmp = self.0[i][j];
-                    self.0[i][j] = self.0[j][n - i - 1];
-                    self.0[j][n - i - 1] = self.0[n - i - 1][n - j - 1];
-                    self.0[n - i - 1][n - j - 1] = self.0[n - j - 1][i];
-                    self.0[n - j - 1][i] = tmp;
+                    let tmp = self.cells[i][j];
+                    self.cells[i][j] = self.cells[j][n - i - 1];
+                    self.cells[j][n - i - 1] = self.cells[n - i - 1][n - j - 1];
+                    self.cells[n - i - 1][n - j - 1] = self.cells[n - j - 1][i];
+                    self.cells[n - j - 1][i] = tmp;
                 }
             }
         }
@@ -158,9 +166,9 @@ impl GameBoard {
     fn all_empty_spaces(&self) -> Vec<GameBoardLocation> {
         let mut locations: Vec<GameBoardLocation> = vec![];
 
-        for y in 0..self.0.len() {
-            for x in 0..self.0.len() {
-                if let BoardSpace::Vacant = self.0[y][x] {
+        for y in 0..self.cells.len() {
+            for x in 0..self.cells.len() {
+                if let BoardSpace::Vacant = self.cells[y][x] {
                     locations.push((x, y));
                 }
             }
@@ -173,17 +181,14 @@ impl GameBoard {
         let free_spaces = self.all_empty_spaces();
 
         if !free_spaces.is_empty() {
-            // TODO: should this be run every time or should it be in the GameBoard struct?
-            let mut rng = rand::thread_rng();
-
-            let tile = if rng.gen_bool(1.0 / 10.0) {
+            let tile = if self.rng.gen_bool(1.0 / 10.0) {
                 BoardSpace::Tile(4)
             } else {
                 BoardSpace::Tile(2)
             };
 
             let pos = free_spaces
-                .choose(&mut rng)
+                .choose(&mut self.rng)
                 .expect("failed to choose random position");
 
             self.set(*pos, tile);
@@ -194,6 +199,15 @@ impl GameBoard {
 impl Default for GameBoard {
     fn default() -> Self {
         Self::empty()
+    }
+}
+
+impl From<[[BoardSpace; GAME_BOARD_SIZE]; GAME_BOARD_SIZE]> for GameBoard {
+    fn from(def: [[BoardSpace; GAME_BOARD_SIZE]; GAME_BOARD_SIZE]) -> Self {
+        Self {
+            cells: def,
+            ..Default::default()
+        }
     }
 }
 
@@ -237,7 +251,7 @@ mod tests {
 
     #[test]
     fn move_up() {
-        let mut board = GameBoard(SAMPLE_GAME_BOARD);
+        let mut board = GameBoard::from(SAMPLE_GAME_BOARD);
 
         board.r#move(MoveDirection::Up);
 
@@ -248,12 +262,12 @@ mod tests {
             [Vacant, Vacant, Vacant, Vacant],
         ];
 
-        assert_eq!(board.0, EXPECTED);
+        assert_eq!(board.cells, EXPECTED);
     }
 
     #[test]
     fn move_down() {
-        let mut board = GameBoard(SAMPLE_GAME_BOARD);
+        let mut board = GameBoard::from(SAMPLE_GAME_BOARD);
 
         board.r#move(MoveDirection::Down);
 
@@ -264,12 +278,12 @@ mod tests {
             [Tile(4), Tile(4), Tile(2), Tile(4)],
         ];
 
-        assert_eq!(board.0, EXPECTED);
+        assert_eq!(board.cells, EXPECTED);
     }
 
     #[test]
     fn move_left() {
-        let mut board = GameBoard(SAMPLE_GAME_BOARD);
+        let mut board = GameBoard::from(SAMPLE_GAME_BOARD);
 
         board.r#move(MoveDirection::Left);
 
@@ -280,12 +294,12 @@ mod tests {
             [Tile(2), Tile(4), Tile(1), Tile(2)],
         ];
 
-        assert_eq!(board.0, EXPECTED);
+        assert_eq!(board.cells, EXPECTED);
     }
 
     #[test]
     fn move_right() {
-        let mut board = GameBoard(SAMPLE_GAME_BOARD);
+        let mut board = GameBoard::from(SAMPLE_GAME_BOARD);
 
         board.r#move(MoveDirection::Right);
 
@@ -296,19 +310,19 @@ mod tests {
             [Tile(2), Tile(4), Tile(1), Tile(2)],
         ];
 
-        assert_eq!(board.0, EXPECTED);
+        assert_eq!(board.cells, EXPECTED);
     }
 
     #[test]
     fn get() {
-        let board = GameBoard(SAMPLE_GAME_BOARD);
+        let board = GameBoard::from(SAMPLE_GAME_BOARD);
         let got = board.get((0, 0));
         assert_eq!(got, BoardSpace::Tile(2));
     }
 
     #[test]
     fn set() {
-        let mut board = GameBoard(SAMPLE_GAME_BOARD);
+        let mut board = GameBoard::from(SAMPLE_GAME_BOARD);
         board.set((0, 0), BoardSpace::Tile(2048));
 
         const EXPECTED: [[BoardSpace; GAME_BOARD_SIZE]; GAME_BOARD_SIZE] = [
@@ -318,6 +332,6 @@ mod tests {
             [Tile(2), Tile(4), Tile(1), Tile(2)],
         ];
 
-        assert_eq!(board.0, EXPECTED);
+        assert_eq!(board.cells, EXPECTED);
     }
 }
