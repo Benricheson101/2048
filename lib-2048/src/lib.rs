@@ -111,7 +111,7 @@ impl GameBoard {
         self.add_random_tile();
     }
 
-    pub fn has_won(&mut self) -> bool {
+    pub fn has_lost(&mut self) -> bool {
         !self.can_move()
     }
 
