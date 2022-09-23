@@ -3,7 +3,7 @@ use lib_2048::{BoardSpace::*, GameBoard, MoveDirection};
 fn main() {
     let mut board = GameBoard([
         [Tile(2), Tile(2), Tile(2), Tile(2)],
-        [Tile(2), Tile(8), Tile(1), Vacant],
+        [Tile(2), Tile(8), Tile(1), Tile(1)],
         [Vacant, Vacant, Vacant, Vacant],
         [Tile(2), Tile(4), Tile(1), Tile(2)],
     ]);
@@ -23,6 +23,22 @@ fn main() {
     print_grid(&board);
 
     board.r#move(MoveDirection::Left);
+    println!("------");
+    print_grid(&board);
+
+    board.r#move(MoveDirection::Up);
+    println!("------");
+    print_grid(&board);
+
+    board.r#move(MoveDirection::Left);
+    println!("------");
+    print_grid(&board);
+
+    board.r#move(MoveDirection::Left);
+    println!("------");
+    print_grid(&board);
+
+    board.r#move(MoveDirection::Up);
     println!("------");
     print_grid(&board);
 

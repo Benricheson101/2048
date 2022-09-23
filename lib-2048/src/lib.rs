@@ -1,7 +1,10 @@
 use std::fmt;
 
+use rand::{seq::SliceRandom, Rng};
+
 /// Default dimensions of the [`GameBoard`]
 pub const GAME_BOARD_SIZE: usize = 4;
+pub const STARTING_TILES: usize = 2;
 
 /// A representation of the location of a space on the game board
 pub type GameBoardLocation = (usize, usize);
@@ -18,8 +21,13 @@ impl GameBoard {
     /// Creates a new square [`GameBoard`](Self) with dimensions [`GAME_BOARD_SIZE`], prefilled
     /// with two tiles
     pub fn new() -> Self {
-        // TODO: fil with two tiles at random places
-        Self([[BoardSpace::Vacant; GAME_BOARD_SIZE]; GAME_BOARD_SIZE])
+        let mut board = Self::empty();
+
+        for _ in 0..STARTING_TILES {
+            board.add_random_tile();
+        }
+
+        board
     }
 
     /// Creates a new blank square [`GameBoard`](Self) with dimensions
@@ -54,134 +62,131 @@ impl GameBoard {
 
     /// Moves all tiles on the board
     pub fn r#move(&mut self, dir: MoveDirection) {
-        match dir {
-            MoveDirection::Up => {
-                for x in 0..self.0.len() {
-                    for y in 0..self.0.len() {
-                        if let BoardSpace::Tile(t) = self.0[y][x] {
-                            for y2 in (y + 1)..self.0.len() {
-                                match self.0[y2][x] {
-                                    BoardSpace::Tile(t2) if t == t2 => {
-                                        self.0[y][x] = BoardSpace::Tile(t * 2);
-                                        self.0[y2][x] = BoardSpace::Vacant;
-                                        break;
-                                    },
-                                    BoardSpace::Tile(_) => break,
-                                    _ => continue,
-                                }
-                            }
-                        }
-                    }
+        let rot = dir as usize;
+        self.rotate(rot);
 
-                    for y in 0..self.0.len() {
-                        if let BoardSpace::Vacant = self.0[y][x] {
-                            for y2 in (y + 1)..self.0.len() {
-                                if let BoardSpace::Tile(_) = self.0[y2][x] {
-                                    self.0[y][x] = self.0[y2][x];
-                                    self.0[y2][x] = BoardSpace::Vacant;
-                                    break;
-                                }
-                            }
+        for y in 0..self.0.len() {
+            for x in 0..self.0.len() {
+                if let BoardSpace::Tile(t) = self.0[y][x] {
+                    for x2 in (x + 1)..self.0.len() {
+                        match self.0[y][x2] {
+                            BoardSpace::Tile(t2) if t == t2 => {
+                                self.0[y][x] = BoardSpace::Tile(t * 2);
+                                self.0[y][x2] = BoardSpace::Vacant;
+                                break;
+                            },
+
+                            BoardSpace::Tile(_) => break,
+                            _ => continue,
                         }
                     }
                 }
-            },
+            }
 
-            MoveDirection::Down => {
-                for x in 0..self.0.len() {
-                    for y in (0..self.0.len()).rev() {
-                        if let BoardSpace::Tile(t) = self.0[y][x] {
-                            for y2 in (0..y).rev() {
-                                match self.0[y2][x] {
-                                    BoardSpace::Tile(t2) if t == t2 => {
-                                        self.0[y][x] = BoardSpace::Tile(t * 2);
-                                        self.0[y2][x] = BoardSpace::Vacant;
-                                        break;
-                                    },
-                                    BoardSpace::Tile(_) => break,
-                                    _ => continue,
-                                }
-                            }
-                        }
-                    }
-
-                    for y in (0..self.0.len()).rev() {
-                        if let BoardSpace::Vacant = self.0[y][x] {
-                            for y2 in (0..y).rev() {
-                                if let BoardSpace::Tile(_) = self.0[y2][x] {
-                                    self.0[y][x] = self.0[y2][x];
-                                    self.0[y2][x] = BoardSpace::Vacant;
-                                    break;
-                                }
-                            }
+            for x in 0..self.0.len() {
+                if let BoardSpace::Vacant = self.0[y][x] {
+                    for x2 in x..self.0.len() {
+                        if let BoardSpace::Tile(_) = self.0[y][x2] {
+                            self.0[y].swap(x, x2);
+                            break;
                         }
                     }
                 }
-            },
+            }
+        }
 
-            MoveDirection::Left => {
-                for y in 0..self.0.len() {
-                    for x in 0..self.0.len() {
-                        if let BoardSpace::Tile(t) = self.0[y][x] {
-                            for x2 in (x + 1)..self.0.len() {
-                                match self.0[y][x2] {
-                                    BoardSpace::Tile(t2) if t == t2 => {
-                                        self.0[y][x] = BoardSpace::Tile(t * 2);
-                                        self.0[y][x2] = BoardSpace::Vacant;
-                                        break;
-                                    },
+        self.rotate(self.0.len() - rot);
 
-                                    BoardSpace::Tile(_) => break,
-                                    _ => continue,
-                                }
-                            }
-                        }
-                    }
+        self.add_random_tile();
+    }
 
-                    for x in 0..self.0.len() {
-                        if let BoardSpace::Vacant = self.0[y][x] {
-                            for x2 in x..self.0.len() {
-                                if let BoardSpace::Tile(_) = self.0[y][x2] {
-                                    self.0[y].swap(x, x2);
-                                    break;
-                                }
-                            }
-                        }
-                    }
-                }
-            },
+    pub fn has_won(&mut self) -> bool {
+        !self.can_move()
+    }
 
-            MoveDirection::Right => {
-                for y in 0..self.0.len() {
-                    for x in (0..self.0.len()).rev() {
-                        if let BoardSpace::Tile(t) = self.0[y][x] {
-                            for x2 in (0..x).rev() {
-                                match self.0[y][x2] {
-                                    BoardSpace::Tile(t2) if t == t2 => {
-                                        self.0[y][x] = BoardSpace::Tile(t * 2);
-                                        self.0[y][x2] = BoardSpace::Vacant;
-                                        break;
-                                    },
+    // TODO: make this not mutate?
+    fn can_move(&mut self) -> bool {
+        for n in 0..4 {
+            self.rotate(n);
 
-                                    BoardSpace::Tile(_) => break,
-                                    _ => continue,
-                                }
-                            }
-                        }
-                    }
+            for y in 0..self.0.len() {
+                for x in 0..(self.0.len() - 1) {
+                    match self.0[y][x] {
+                        BoardSpace::Vacant => {
+                            self.rotate(4 - n);
+                            return true;
+                        },
 
-                    for x in (0..self.0.len()).rev() {
-                        if let BoardSpace::Vacant = self.0[y][x] {
-                            for x2 in (0..x).rev() {
-                                if let BoardSpace::Tile(_) = self.0[y][x2] {
-                                    self.0[y].swap(x, x2);
-                                    break;
-                                }
-                            }
-                        }
+                        BoardSpace::Tile(t) => match self.0[y][x + 1] {
+                            BoardSpace::Vacant => {
+                                self.rotate(4 - n);
+                                return true;
+                            },
+
+                            BoardSpace::Tile(t2) if t == t2 => {
+                                self.rotate(4 - n);
+                                return true;
+                            },
+
+                            _ => continue,
+                        },
                     }
                 }
-            },
+            }
+        }
+
+        false
+    }
+
+    fn rotate(&mut self, times: usize) {
+        let n = self.0.len();
+
+        for _ in 0..times {
+            // credit: someone on stackoverflow idk
+            for i in 0..(n / 2) {
+                for j in i..(n - i - 1) {
+                    let tmp = self.0[i][j];
+                    self.0[i][j] = self.0[j][n - i - 1];
+                    self.0[j][n - i - 1] = self.0[n - i - 1][n - j - 1];
+                    self.0[n - i - 1][n - j - 1] = self.0[n - j - 1][i];
+                    self.0[n - j - 1][i] = tmp;
+                }
+            }
+        }
+    }
+
+    fn all_empty_spaces(&self) -> Vec<GameBoardLocation> {
+        let mut locations: Vec<GameBoardLocation> = vec![];
+
+        for y in 0..self.0.len() {
+            for x in 0..self.0.len() {
+                if let BoardSpace::Vacant = self.0[y][x] {
+                    locations.push((x, y));
+                }
+            }
+        }
+
+        locations
+    }
+
+    fn add_random_tile(&mut self) {
+        let free_spaces = self.all_empty_spaces();
+
+        if !free_spaces.is_empty() {
+            // TODO: should this be run every time or should it be in the GameBoard struct?
+            let mut rng = rand::thread_rng();
+
+            let tile = if rng.gen_bool(1.0 / 10.0) {
+                BoardSpace::Tile(4)
+            } else {
+                BoardSpace::Tile(2)
+            };
+
+            let pos = free_spaces
+                .choose(&mut rng)
+                .expect("failed to choose random position");
+
+            self.set(*pos, tile);
         }
     }
 }
@@ -195,10 +200,10 @@ impl Default for GameBoard {
 /// The direction of a [`move`](GameBoard::move)
 #[derive(Debug)]
 pub enum MoveDirection {
-    Up,
-    Down,
-    Left,
-    Right,
+    Left = 0,
+    Up = 1,
+    Right = 2,
+    Down = 3,
 }
 
 /// A space on the [`GameBoard`]
