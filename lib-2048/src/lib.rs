@@ -68,7 +68,7 @@ impl GameBoard {
         self.cells[y][x] = val;
     }
 
-    /// Moves all tiles on the board
+    /// Moves all tiles on the board, merging any adjacent tiles of the same numeric value
     pub fn r#move(&mut self, dir: MoveDirection) {
         let rot = dir as usize;
         self.rotate(rot);
@@ -79,7 +79,10 @@ impl GameBoard {
                     for x2 in (x + 1)..self.cells.len() {
                         match self.cells[y][x2] {
                             BoardSpace::Tile(t2) if t == t2 => {
-                                self.cells[y][x] = BoardSpace::Tile(t * 2);
+                                let new_val = t * 2;
+                                self.score += new_val;
+
+                                self.cells[y][x] = BoardSpace::Tile(new_val);
                                 self.cells[y][x2] = BoardSpace::Vacant;
                                 break;
                             },

@@ -11,39 +11,39 @@ fn main() {
     print_grid(&board);
 
     board.r#move(MoveDirection::Right);
-    println!("------");
+    println!("--- score: {} ---", &board.score);
     print_grid(&board);
 
     board.r#move(MoveDirection::Up);
-    println!("------");
+    println!("--- score: {} ---", &board.score);
     print_grid(&board);
 
     board.r#move(MoveDirection::Right);
-    println!("------");
+    println!("--- score: {} ---", &board.score);
     print_grid(&board);
 
     board.r#move(MoveDirection::Left);
-    println!("------");
+    println!("--- score: {} ---", &board.score);
     print_grid(&board);
 
     board.r#move(MoveDirection::Up);
-    println!("------");
+    println!("--- score: {} ---", &board.score);
     print_grid(&board);
 
     board.r#move(MoveDirection::Left);
-    println!("------");
+    println!("--- score: {} ---", &board.score);
     print_grid(&board);
 
     board.r#move(MoveDirection::Left);
-    println!("------");
+    println!("--- score: {} ---", &board.score);
     print_grid(&board);
 
     board.r#move(MoveDirection::Up);
-    println!("------");
+    println!("--- score: {} ---", &board.score);
     print_grid(&board);
 
     board.r#move(MoveDirection::Up);
-    println!("------");
+    println!("--- score: {} ---", &board.score);
     print_grid(&board);
 }
 
