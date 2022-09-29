@@ -1,6 +1,7 @@
 use std::fmt;
 
-use rand::{rngs::ThreadRng, seq::SliceRandom, Rng};
+#[cfg(not(test))]
+use rand::{rngs::OsRng, seq::SliceRandom, Rng};
 
 /// Default dimensions of the [`GameBoard`]
 pub const GAME_BOARD_SIZE: usize = 4;
@@ -14,11 +15,12 @@ pub type GameBoardLocation = (usize, usize);
 /// The `(0,0)` origin of the board is located in the top-left corner of the
 /// board, with coordinates increasing as you move toward the bottom-right of
 /// the board. Coordinates are in the form (row, column)
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct GameBoard {
     pub cells: [[BoardSpace; GAME_BOARD_SIZE]; GAME_BOARD_SIZE],
     pub score: usize,
-    rng: ThreadRng,
+    #[cfg(not(test))]
+    rng: OsRng,
 }
 
 impl GameBoard {
@@ -41,7 +43,7 @@ impl GameBoard {
     /// use lib_2048::{BoardSpace::*, GameBoard};
     ///
     /// assert_eq!(
-    ///     GameBoard::empty().0,
+    ///     GameBoard::empty().cells,
     ///     [
     ///         [Vacant, Vacant, Vacant, Vacant],
     ///         [Vacant, Vacant, Vacant, Vacant],
@@ -54,7 +56,8 @@ impl GameBoard {
         Self {
             cells: [[BoardSpace::Vacant; GAME_BOARD_SIZE]; GAME_BOARD_SIZE],
             score: 0,
-            rng: rand::thread_rng(),
+            #[cfg(not(test))]
+            rng: OsRng {},
         }
     }
 
@@ -73,6 +76,8 @@ impl GameBoard {
         let rot = dir as usize;
         self.rotate(rot);
 
+        let mut moved = false;
+
         for y in 0..self.cells.len() {
             for x in 0..self.cells.len() {
                 if let BoardSpace::Tile(t) = self.cells[y][x] {
@@ -84,6 +89,8 @@ impl GameBoard {
 
                                 self.cells[y][x] = BoardSpace::Tile(new_val);
                                 self.cells[y][x2] = BoardSpace::Vacant;
+
+                                moved = true;
                                 break;
                             },
 
@@ -99,6 +106,8 @@ impl GameBoard {
                     for x2 in x..self.cells.len() {
                         if let BoardSpace::Tile(_) = self.cells[y][x2] {
                             self.cells[y].swap(x, x2);
+
+                            moved = true;
                             break;
                         }
                     }
@@ -108,34 +117,39 @@ impl GameBoard {
 
         self.rotate(self.cells.len() - rot);
 
-        self.add_random_tile();
+        if moved {
+            self.add_random_tile();
+        }
     }
 
-    pub fn has_lost(&mut self) -> bool {
+    pub fn has_lost(&self) -> bool {
         !self.can_move()
     }
 
     // TODO: make this not mutate?
-    fn can_move(&mut self) -> bool {
-        for n in 0..4 {
-            self.rotate(n);
+    fn can_move(&self) -> bool {
+        // TODO: ugly hack, is there a better way to do this?
+        let mut cells = self.cells.clone();
 
-            for y in 0..self.cells.len() {
-                for x in 0..(self.cells.len() - 1) {
-                    match self.cells[y][x] {
+        for n in 0..4 {
+            rotate(&mut cells, n);
+
+            for y in 0..cells.len() {
+                for x in 0..(cells.len() - 1) {
+                    match cells[y][x] {
                         BoardSpace::Vacant => {
-                            self.rotate(4 - n);
+                            rotate(&mut cells, 4 - n);
                             return true;
                         },
 
-                        BoardSpace::Tile(t) => match self.cells[y][x + 1] {
+                        BoardSpace::Tile(t) => match cells[y][x + 1] {
                             BoardSpace::Vacant => {
-                                self.rotate(4 - n);
+                                rotate(&mut cells, 4 - n);
                                 return true;
                             },
 
                             BoardSpace::Tile(t2) if t == t2 => {
-                                self.rotate(4 - n);
+                                rotate(&mut cells, 4 - n);
                                 return true;
                             },
 
@@ -150,20 +164,7 @@ impl GameBoard {
     }
 
     fn rotate(&mut self, times: usize) {
-        let n = self.cells.len();
-
-        for _ in 0..times {
-            // credit: someone on stackoverflow idk
-            for i in 0..(n / 2) {
-                for j in i..(n - i - 1) {
-                    let tmp = self.cells[i][j];
-                    self.cells[i][j] = self.cells[j][n - i - 1];
-                    self.cells[j][n - i - 1] = self.cells[n - i - 1][n - j - 1];
-                    self.cells[n - i - 1][n - j - 1] = self.cells[n - j - 1][i];
-                    self.cells[n - j - 1][i] = tmp;
-                }
-            }
-        }
+        rotate(&mut self.cells, times);
     }
 
     fn all_empty_spaces(&self) -> Vec<GameBoardLocation> {
@@ -180,6 +181,10 @@ impl GameBoard {
         locations
     }
 
+    #[cfg(test)]
+    fn add_random_tile(&mut self) {}
+
+    #[cfg(not(test))]
     fn add_random_tile(&mut self) {
         let free_spaces = self.all_empty_spaces();
 
@@ -235,8 +240,28 @@ pub enum BoardSpace {
 impl fmt::Display for BoardSpace {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::Vacant => write!(f, "-"),
+            Self::Vacant => write!(f, ""),
             Self::Tile(n) => write!(f, "{n}"),
+        }
+    }
+}
+
+fn rotate(
+    arrs: &mut [[BoardSpace; GAME_BOARD_SIZE]; GAME_BOARD_SIZE],
+    times: usize,
+) {
+    let n = arrs.len();
+
+    // credit: someone on stackoverflow idk
+    for _ in 0..times {
+        for i in 0..(n / 2) {
+            for j in i..(n - i - 1) {
+                let tmp = arrs[i][j];
+                arrs[i][j] = arrs[j][n - i - 1];
+                arrs[j][n - i - 1] = arrs[n - i - 1][n - j - 1];
+                arrs[n - i - 1][n - j - 1] = arrs[n - j - 1][i];
+                arrs[n - j - 1][i] = tmp;
+            }
         }
     }
 }
@@ -336,5 +361,15 @@ mod tests {
         ];
 
         assert_eq!(board.cells, EXPECTED);
+    }
+
+    #[test]
+    fn all_empty_spaces() {
+        let board = GameBoard::from(SAMPLE_GAME_BOARD);
+
+        let expected = vec![(3, 1), (0, 2), (1, 2), (2, 2), (3, 2)];
+
+        let got = board.all_empty_spaces();
+        assert_eq!(got, expected);
     }
 }
