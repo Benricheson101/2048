@@ -1,5 +1,14 @@
 [workspace]
 members = [
-  "lib-2048",
   "cli-2048",
+  "desktop-2048",
+  "discord-2048",
+  "lib-2048",
+  "web-2048",
 ]
+
+[profile.release]
+panic = "abort"
+codegen-units = 1
+opt-level = 'z'
+lto = true
