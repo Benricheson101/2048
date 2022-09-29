@@ -2,7 +2,6 @@
 members = [
   "cli-2048",
   "desktop-2048",
-  "discord-2048",
   "lib-2048",
   "web-2048",
 ]
